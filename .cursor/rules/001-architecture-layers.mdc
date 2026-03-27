@@ -19,10 +19,9 @@ src/
     message/        # Chat messages (Mongoose)
     realtime/       # Socket.IO Gateways
   shared/           # Global infrastructure & cross-module logic
+    Implement infrastructure here. Ex:
     database/       # Drizzle providers
-    redis/          # ioredis providers
-    permission/     # Global PermissionService (The source of truth for access)
-    guards/         # JWT & WS Auth
+    guards/         # JWT & WS Auth ...
 ```
 
 ## Layer responsibilities — each layer does exactly one job
