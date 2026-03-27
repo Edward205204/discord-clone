@@ -1,0 +1,49 @@
+---
+description: Project overview and technology context. Always read this first.
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Project Context — Discord Clone
+
+## What this is
+A realtime text chat platform built around servers and channels.
+Target: CV project demonstrating hybrid DB architecture, realtime systems, and clean NestJS structure.
+Scale target: CV-level, not production. Optimise for code clarity and correct architecture over performance.
+
+## Tech stack
+| Layer | Technology |
+|---|---|
+| Framework | NestJS (TypeScript) |
+| Relational DB | PostgreSQL via Drizzle ORM |
+| Document DB | MongoDB via Mongoose |
+| Realtime | Socket.IO (NestJS Gateway) |
+| Auth | JWT (access token only, no refresh for MVP) |
+
+## Core domain concepts
+- **Server (Guild)** — a community space, has an owner
+- **Channel** — a text channel inside a server
+- **Membership** — a user belonging to a server
+- **Message** — a single chat message, stored in MongoDB
+
+## The architectural argument (CV talking point)
+PostgreSQL handles relational data and permission checks — things that need consistency and joins.
+MongoDB handles messages — high-volume, append-heavy, queried always by channelId.
+The split is justified by access pattern, not fashion.
+**This argument only holds if the boundary is maintained in code.**
+
+## MVP scope — done means done
+- [ ] Auth (register, login, JWT)
+- [ ] Server CRUD (create, join via invite, list)
+- [ ] Channel CRUD (create inside server, list)
+- [ ] Send message (realtime via socket)
+- [ ] Load message history (cursor pagination)
+- [ ] Basic permission (membership check before send)
+
+## Out of scope — do not implement
+- Voice / video
+- File/image uploads
+- Role matrix (beyond owner vs member)
+- Push notifications
+- Read receipts
+- Message editing / deletion (nice-to-have, not MVP)

@@ -1,0 +1,174 @@
+---
+description: NestJS module structure and layer responsibilities. Apply when creating or editing any module, service, controller, repository, or gateway file.
+globs: ['src/modules/**/*.ts']
+alwaysApply: false
+---
+
+# Architecture & Layer Rules
+
+## Module structure — every feature follows this shape
+
+```
+## Module structure — Core logic lives in modules/
+src/
+  modules/
+    auth/           # Refresh token (Drizzle)
+    user/           # Hybrid Repository (Postgres + Redis Cache)
+    server/         # Servers, Invites, Memberships
+    channel/        # Channels & Channel-Members
+    message/        # Chat messages (Mongoose)
+    realtime/       # Socket.IO Gateways
+  shared/           # Global infrastructure & cross-module logic
+    database/       # Drizzle providers
+    redis/          # ioredis providers
+    permission/     # Global PermissionService (The source of truth for access)
+    guards/         # JWT & WS Auth
+```
+
+## Layer responsibilities — each layer does exactly one job
+
+### Controller
+
+- Receive request, validate input (via DTO + Zod pipe)
+- Call one service method
+- Return response
+- **NEVER**: business logic, DB queries, direct ORM/Mongoose imports
+
+### Service — also acts as a Facade
+
+- Business logic and orchestration
+- The only layer that calls both Postgres (via Drizzle) and MongoDB (via Mongoose)
+- Returns typed DTOs — never raw DB objects
+- **NEVER**: import Drizzle or Mongoose directly — call through repositories
+
+### Repository
+
+- DB queries only — one repository per DB per module
+- `*.pg.repository.ts` → Drizzle + PostgreSQL
+- `*.mongo.repository.ts` → Mongoose + MongoDB
+- **NEVER**: business logic, conditionals about domain rules, cross-DB queries
+
+### Socket Gateway (realtime/)
+
+- Handle socket events
+- Call services for logic (never inline permission checks)
+- Emit to rooms
+- **NEVER**: DB queries directly, business rules inline
+
+## Cross-layer import rule
+
+```
+Controller → Service → Repository
+Gateway    → Service → Repository
+```
+
+No skipping, no reverse direction, no circular imports.
+
+## Facade Pattern — Service as the single entry point
+
+A Service is a Facade over its repositories and dependencies.
+If an action requires calling multiple repositories or services, the Service must expose a single method with a business-meaningful name — callers never orchestrate the steps themselves.
+
+```typescript
+// ✅ Caller sees one business action — does not know what happens inside
+const message = await this.messageService.sendMessage(dto);
+
+// ✅ Service owns the orchestration — permission check + snapshot + insert
+async sendMessage(dto: SendMessageDto): Promise<MessageResponseDto> {
+  await this.permissionService.assertChannelAccess(dto.userId, dto.channelId);
+  const sender = await this.userService.findById(dto.userId);
+  return this.messageRepo.insert({ ...dto, sender });
+}
+
+// ❌ Caller doing the orchestration — Facade is broken
+await this.permissionService.assertChannelAccess(dto.userId, dto.channelId);
+const sender = await this.userService.findById(dto.userId);
+await this.messageRepo.insert({ ...dto, sender });
+```
+
+Rule: if a caller needs to call more than one service method to complete one business action, a Facade method is missing.
+
+## Observer Pattern — Event-driven side effects
+
+Secondary logic (analytics, incrementing counts, notifications) must not be called directly inside the primary service method. Use `EventEmitter2` to decouple them.
+
+```typescript
+// ✅ Primary service only does its core job, then emits
+async joinServer(userId: string, inviteCode: string): Promise<void> {
+  await this.membershipRepo.insert({ userId, serverId, inviteCode });
+  this.eventEmitter.emit(ServerEvent.MEMBER_JOINED, { userId, serverId, inviteCode });
+}
+
+// ✅ Side effects live in their own handlers — primary service has no knowledge of them
+@OnEvent(ServerEvent.MEMBER_JOINED)
+async onMemberJoined({ inviteCode }: MemberJoinedEvent): Promise<void> {
+  await this.inviteRepo.incrementUseCount(inviteCode);
+}
+
+// ❌ Primary service knows too much — adding a new side effect means editing this file
+async joinServer(userId: string, inviteCode: string): Promise<void> {
+  await this.membershipRepo.insert({ userId, serverId, inviteCode });
+  await this.inviteRepo.incrementUseCount(inviteCode);   // side effect inline
+  await this.notifService.sendWelcome(userId);            // another side effect inline
+}
+```
+
+Rule: use `EventEmitter2` only when there are 2 or more independent side effects, or when the side effect belongs to a different domain than the primary action. For a single tightly-related follow-up, a direct call is cleaner.
+
+All event name constants must live in a centralized enum:
+
+```typescript
+export const ServerEvent = {
+  MEMBER_JOINED: 'server.member_joined',
+} as const
+```
+
+## Consistent Error Handling — GlobalExceptionFilter
+
+All exceptions must flow through `GlobalExceptionFilter`. Never construct ad-hoc error responses in controllers or services.
+
+```typescript
+// ✅ Throw NestJS built-in exceptions — filter handles the rest
+throw new ForbiddenException('No access to this private channel')
+throw new NotFoundException('Channel not found')
+throw new BadRequestException('Invite has expired')
+
+// ❌ Never build raw error objects or call res.status() manually
+return res.status(403).json({ error: 'forbidden' })
+throw new Error('something went wrong')
+```
+
+`GlobalExceptionFilter` enforces a single response shape across the entire API:
+
+```json
+{
+  "statusCode": 403,
+  "message": "No access to this private channel",
+  "timestamp": "2025-03-27T10:00:00.000Z",
+  "path": "/channels/abc/messages"
+}
+```
+
+Register the filter globally in `main.ts` — never scope it to a single controller.
+
+## DTOs
+
+- Every service method input and output is a typed DTO
+- Use `nestjs-zod` schemas for incoming DTOs — parse at the Controller boundary
+- Never return raw Drizzle `InferSelectModel` or raw Mongoose documents from a service
+
+## Example: send message — correct flow
+
+```typescript
+// Gateway calls one service method — Facade in action
+const msg = await this.messageService.sendMessage(dto);
+this.server.to(`channel:${dto.channelId}`).emit(SocketEvent.NEW_MESSAGE, msg);
+
+// Service owns all orchestration steps
+async sendMessage(dto: SendMessageDto): Promise<MessageResponseDto> {
+  await this.permissionService.assertChannelAccess(dto.userId, dto.channelId);
+  const sender = await this.userService.findById(dto.userId);
+  return this.messageRepo.insert({ ...dto, sender });
+  // no event emitted here — send message has no secondary side effects in MVP
+}
+```

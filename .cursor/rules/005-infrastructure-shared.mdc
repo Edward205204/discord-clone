@@ -1,0 +1,109 @@
+---
+description: Rules for the shared/ directory. Apply when creating or editing any file inside src/shared/.
+globs: ["src/shared/**/*.ts"]
+alwaysApply: false
+---
+
+# Shared Directory Rules (Infrastructure & Utilities)
+
+## 1. What shared/ is
+
+`src/shared/` is the **Infrastructure Layer** — it provides tools, config, and global providers.
+It has no opinion about any specific business domain.
+If a file starts to understand the logic of `Message` or `Server` too deeply, it does not belong here.
+
+## 2. The One-Way Dependency Rule
+
+```
+modules/ → shared/    ✅ allowed — features depend on infrastructure
+shared/  → modules/   ❌ strictly forbidden — infrastructure knows nothing about features
+```
+
+No file inside `shared/` may import from `src/modules/`.
+Violation causes NestJS circular dependency — the app crashes on startup.
+If shared logic needs something from a module, move it into that module or promote it to its own module.
+
+## 3. Dynamic Identification — How to decide if a new folder belongs here
+
+Before adding any new folder or file to `shared/`, apply this test:
+
+> "Can this file work correctly without knowing anything about the app's features?"
+
+If yes → it belongs in `shared/`.
+If no → it belongs in a module or needs its own module.
+
+Typical infrastructure that passes the test:
+
+- `database/`, `redis/` — connection config and providers
+- `guards/`, `filters/`, `interceptors/` — global request/response handling
+- `pipes/` — format validation (UUID, ObjectId) using **Zod** schemas
+- `decorators/` — pure request utilities (`@CurrentUser()`, `@CurrentSocket()`)
+- `permission/` — `PermissionService`, source of truth for access assertions
+- `constants/` — centralized enums (`MemberRole`, `SocketEvent`, `ServerEvent`)
+- `dtos/` — shared Zod schemas used across modules (`PaginationDto`, `CursorDto`)
+
+This list is illustrative, not exhaustive. Any new folder that passes the test above is valid.
+
+## 4. Zod in shared/
+
+All pipes and shared DTOs in `shared/` must use `nestjs-zod` — no `class-validator` here.
+
+```typescript
+// ✅ shared/dtos/pagination.dto.ts
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+const PaginationSchema = z.object({
+  cursor: z.string().datetime().optional(),
+  limit:  z.number().int().min(1).max(100).default(50),
+});
+
+export class PaginationDto extends createZodDto(PaginationSchema) {}
+
+// ✅ shared/pipes/parse-uuid.pipe.ts — validate format only, no business logic
+const UuidSchema = z.string().uuid('Invalid UUID format');
+```
+
+## 5. PermissionService — The Internal Query Rule
+
+`PermissionService` lives in `shared/permission/` even though it queries domain tables
+(`memberships`, `channel_members`, `channels`). It belongs here because:
+- It is consumed by three modules (message, channel, realtime)
+- It contains no business logic — only access assertions
+- It has no dependency on any module
+
+**Rule:** `PermissionService` must inject `DRIZZLE_DB` directly and query tables using the
+shared Drizzle schema. It must never inject a Repository from `src/modules/`.
+
+```typescript
+// ✅ correct — inject db token directly
+constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDb) {}
+
+// ❌ forbidden — importing a repository from a module creates a cycle
+constructor(private readonly membershipRepo: MembershipRepository) {}
+//           ↑ MembershipRepository lives in server/ — this import would be shared/ → modules/
+```
+
+If `PermissionService` ever needs to import from a module, that is a signal the logic
+no longer belongs in `shared/` — move it into the module that owns it.
+
+## 6. Global Module Pattern
+
+`DatabaseModule`, `RedisModule`, and `PermissionModule` must be decorated with `@Global()`.
+Import them once in `AppModule` only. Never re-import them in feature modules.
+
+```typescript
+// ✅ declared global — injected everywhere without re-importing
+@Global()
+@Module({ providers: [RedisProvider], exports: [REDIS_CLIENT] })
+export class RedisModule {}
+
+// ❌ re-importing a global module in a feature module — remove this
+@Module({ imports: [RedisModule], ... })
+export class UserModule {}
+```
+
+## 7. Naming
+
+All providers in `shared/` must use explicit suffixes: `.service.ts`, `.provider.ts`, `.guard.ts`, `.filter.ts`, `.pipe.ts`.
+Never write business operations here — no `sendEmail()`, no `calculateInviteValidity()`, no domain-specific formatting.

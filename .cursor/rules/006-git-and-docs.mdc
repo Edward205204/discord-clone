@@ -1,0 +1,130 @@
+---
+description: Git commit conventions and architecture documentation rules. Apply when suggesting commits, explaining architectural decisions, or modifying core structure.
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# Git & Documentation Rules
+
+## Commit Messages — Conventional Commits
+
+Every commit must follow the Conventional Commits format. No exceptions.
+
+```
+<type>(<scope>): <short description>
+
+[optional body — explain WHY, not WHAT]
+```
+
+### Types
+
+| Type | When to use |
+|---|---|
+| `feat` | A new feature visible to the user or API consumer |
+| `fix` | A bug fix |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `chore` | Tooling, deps, config — no production code change |
+| `docs` | README, ADR, comments only |
+| `test` | Adding or fixing tests |
+| `perf` | Performance improvement |
+
+### Scope — use the module name
+
+`auth`, `user`, `server`, `channel`, `message`, `realtime`, `shared`, `db`, `redis`
+
+### Examples
+
+```
+# ✅ correct
+feat(message): add soft delete with ownership check
+fix(invite): prevent use after revocation
+refactor(user): extract cache logic into UserCacheRepository
+chore(deps): upgrade drizzle-orm to 0.31.0
+docs(adr): record decision to use snapshot pattern for message sender
+perf(message): add compound index on channelId + createdAt
+
+# ❌ wrong
+fix bug
+update message service
+WIP
+temp
+```
+
+### When AI suggests a commit
+
+Always propose the full commit message in the format above.
+If the change spans multiple concerns, propose splitting it into separate commits.
+Never suggest a single commit for changes across more than two modules.
+
+---
+
+## Architecture Decision Records (ADR)
+
+An ADR must be written whenever a decision meets any of these criteria:
+
+- A specific technology was chosen over alternatives (e.g. Mongoose over native driver)
+- A design pattern was introduced (e.g. snapshot pattern, Facade, Observer)
+- A tradeoff was consciously accepted (e.g. stale avatar in exchange for fewer round trips)
+- A previously considered approach was rejected and should not be revisited
+
+### Location
+
+```
+docs/
+  adr/
+    001-hybrid-database.md
+    002-snapshot-pattern-for-message-sender.md
+    003-redis-sliding-ttl-for-user-cache.md
+    004-stateless-auth-without-blacklist.md
+```
+
+### ADR format — keep it short
+
+```markdown
+# ADR-{number}: {title}
+
+**Status:** Accepted
+
+## Context
+What problem were we solving? What constraints existed?
+
+## Decision
+What did we decide to do?
+
+## Consequences
+What becomes easier? What becomes harder? What do we accept as a tradeoff?
+```
+
+### Examples of decisions that already need an ADR in this project
+
+| ADR | Decision |
+|---|---|
+| `001-hybrid-database` | Postgres for relational data, MongoDB for messages |
+| `002-snapshot-pattern` | Embed sender info in message document instead of hydrating from Postgres |
+| `003-redis-user-cache` | Cache user profiles with sliding TTL + invalidate on update |
+| `004-stateless-auth` | No JWT blacklist in MVP — accept 15-minute window on logout |
+
+### When AI must prompt for an ADR
+
+If a task involves any of the following, AI must remind the developer to write or update an ADR before closing the task:
+
+- Changing which database stores a type of data
+- Adding or removing a design pattern from the codebase
+- Choosing between two libraries or approaches
+- Accepting a known limitation or tradeoff
+
+Example reminder:
+> "This changes how user identity is resolved in messages. Consider writing ADR-002 to record why snapshot pattern was chosen over runtime hydration."
+
+---
+
+## README — kept current, not exhaustive
+
+`README.md` must always reflect the current state of:
+
+- Tech stack with versions
+- How to run the project locally
+- Environment variables required (names only, no values)
+- Link to `docs/adr/` for architecture decisions
+
+README is not the place for ADR content. Keep it as an entry point, not a design document.

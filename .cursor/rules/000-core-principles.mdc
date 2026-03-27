@@ -1,0 +1,85 @@
+---
+description: Core engineering principles. Apply to every task without exception.
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Core Engineering Principles
+
+## 1. Priority Order — The Golden Path
+
+1. **Correct** — logic works, edge cases and errors are handled.
+2. **Clean** — readable, well-named, layers are clearly separated.
+3. **Fast** — optimize only when a real bottleneck is proven by measurement.
+
+> **Rule:** Never skip from step 1 to step 3. Never optimize code that doesn't work yet.
+
+## 2. Naming — Write Code for the Reader, Not the Machine
+
+The machine doesn't care about variable names. The developer reading this in 3 months does.
+
+- **No domain abbreviations:** `userId` not `uid`, `channelId` not `cid`, `serverId` not `sid`.
+  Framework conventions (`req`, `res`, `ctx`, `dto`) are acceptable — they are ecosystem-wide standards.
+- **Verb + Noun for functions:** A function name must describe a concrete action.
+  - ✅ `assertUserCanSendMessage`, `fetchMemberWithPermissions`, `invalidateUserCache`
+  - ❌ `check`, `getData`, `handle`, `process`
+- **Boolean prefix:** All boolean variables must use `is`, `has`, `should`, or `can`.
+  - ✅ `isOwner`, `hasJoinedServer`, `canSendMessage`, `isRevoked`
+  - ❌ `owner`, `joined`, `active`
+
+## 3. Make Invalid State Impossible
+
+Block invalid data at the entry point — never let it flow down to the service layer.
+
+- **Zod for all I/O:** Use `nestjs-zod` to define DTOs. Every input (incoming request) and output (response) must be parsed through a Zod schema.
+- **Fail early:** Reject bad data at the Controller via Zod pipe. A service method should never receive unvalidated input.
+- **Encode constraints in types:** Use Zod's built-in validators (`.min(1)`, `.email()`, `.url()`, `.uuid()`) instead of manual `if/else` checks inside logic.
+
+## 4. Zero Magic Values
+
+Never leave unexplained numbers or strings inside logic.
+
+- **Named constants for all fixed values:**
+  - ✅ `const DEFAULT_MESSAGE_LIMIT = 50` · `const MESSAGE_MAX_LENGTH = 2000` · `const USER_CACHE_TTL_SECONDS = 600`
+  - ❌ `limit(50)` · `if (content.length > 2000)` · `'EX', 600`
+- **Centralized enums for roles, statuses, and event names:**
+  ```typescript
+  export const MemberRole = { OWNER: 'owner', MEMBER: 'member' } as const;
+  export const SocketEvent = { JOIN_CHANNEL: 'join_channel', NEW_MESSAGE: 'new_message' } as const;
+  ```
+
+## 5. The 3-Question Self-Review
+
+Before generating or committing any code, answer these in order:
+
+1. **"Does it work?"** — Does it handle the happy path and relevant edge cases?
+2. **"Can someone read it?"** — Would a new developer understand what this function does without reading comments?
+3. **"Is it over-engineered?"** — Is any abstraction or pattern added for a problem that doesn't exist yet?
+
+If question 3 is yes, simplify before proceeding.
+
+## 6. Redis Usage — Explicit Scope
+
+Redis is pre-approved for exactly two purposes in this project:
+
+- **Refresh token storage** — shared across instances, self-expiring.
+- **User profile cache** — sliding TTL, invalidated on profile update.
+
+Do not introduce any other cache layer without a measured bottleneck to justify it.
+Adding cache before proving slowness creates complexity with no benefit.
+
+## 7. Scope Control — What This Project Does Not Do
+
+Stay focused. Do not implement the following unless explicitly instructed:
+
+- Voice or video features
+- Microservices or message queues
+- Complex permission roles beyond `owner` and `member`
+- Any new Redis cache beyond the two approved above
+- Notification systems beyond socket emit
+
+If a task would require any of the above, flag it and propose a simpler alternative.
+
+---
+
+**Note for AI:** When generating code, if a variable or function name is too short or lacks context, automatically suggest a longer, more descriptive name following the rules in section 2. Do not wait to be asked.

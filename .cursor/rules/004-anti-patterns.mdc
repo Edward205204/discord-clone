@@ -1,0 +1,84 @@
+---
+description: Anti-patterns to detect and refuse. If any of these patterns appear in a task, flag them before writing code.
+globs: ["src/**/*.ts"]
+alwaysApply: false
+---
+
+# Anti-Patterns — Flag These Before Writing Code
+
+If you are about to write any of the following, stop and raise it with the developer first.
+
+## 🔴 Hard stops — do not proceed
+
+### Querying MongoDB to check permissions
+```typescript
+// WRONG — membership check must go through Postgres
+const member = await MessageModel.findOne({ channelId, userId });
+if (!member) throw new ForbiddenException();
+```
+**Why**: MongoDB stores messages, not membership. This check will silently pass or fail incorrectly.
+
+### Drizzle and Mongoose imported in the same service/controller
+```typescript
+// WRONG — cross-DB imports in one file indicate a missing layer
+import { db } from '../drizzle/db';
+import { MessageModel } from '../message/message.schema';
+```
+**Why**: Services should call repositories. If both ORM and ODM appear in one file, a repository is missing.
+
+### Business logic inside a repository
+```typescript
+// WRONG — repository doing domain logic
+async findMessages(channelId: string, userId: string) {
+  const isMember = await db.select()...; // this is service-level logic
+  if (!isMember) throw new ForbiddenException();
+  return MessageModel.find({ channelId });
+}
+```
+**Why**: Repositories only query. Permission checks belong in the service.
+
+### userId taken from client socket payload
+```typescript
+// WRONG
+@SubscribeMessage('send_message')
+async handle(client: Socket, { channelId, userId, content }) {
+  // using userId from client payload = security hole
+}
+```
+**Why**: Always use `client.data.userId` set during JWT auth at connection time.
+
+## 🟡 Warnings — flag and discuss
+
+### offset-based pagination on messages
+```typescript
+MessageModel.find({ channelId }).skip(page * 50).limit(50)
+```
+**Flag as**: Use cursor-based pagination with `createdAt` instead.
+
+### Mongoose populate referencing a PostgreSQL ID
+```typescript
+Message.find({ channelId }).populate('userId')
+```
+**Flag as**: userId is a Postgres UUID. Populate won't work. Hydrate user data in the service layer.
+
+### Returning raw DB objects from a service
+```typescript
+async getMessages(): Promise<InferSelectModel<typeof messages>[]>
+```
+**Flag as**: Define a `MessageResponseDto` and map before returning.
+
+### Adding index or cache before feature is working
+Writing `createIndex`, Redis logic, or query optimization before the basic happy path is tested.
+**Flag as**: Follow correct → clean → fast order.
+
+### A service method longer than ~40 lines
+**Flag as**: Likely doing too many things. Extract into smaller methods or a separate service.
+
+## ✅ Confirm these patterns are present
+
+Before finishing any feature, verify:
+- [ ] Permission check runs on Postgres before any Mongo write
+- [ ] Gateway handler calls service, not repository directly  
+- [ ] `userId` in socket events comes from `client.data`, not payload
+- [ ] Service returns a typed DTO, not a raw ORM object
+- [ ] Repository file name ends with `.pg.repository.ts` or `.mongo.repository.ts`

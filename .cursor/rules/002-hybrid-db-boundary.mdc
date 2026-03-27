@@ -1,0 +1,93 @@
+---
+description: Hybrid database rules — PostgreSQL vs MongoDB. Apply when writing any repository, query, or schema file.
+globs: ["src/**/*.repository.ts", "src/**/*.schema.ts", "src/**/**/drizzle/**"]
+alwaysApply: false
+---
+
+# Hybrid DB Rules — The Hard Boundary
+
+## Rule: each DB has one job, no overlap
+
+| Concern | Database | ORM/Driver |
+|---|---|---|
+| Users, servers, channels, membership, permissions | PostgreSQL | Drizzle ORM |
+| Messages | MongoDB | Mongoose |
+
+**This boundary is non-negotiable.** Crossing it (e.g. storing permission data in Mongo, or messages in Postgres) breaks the architectural argument entirely — which is the core CV talking point.
+
+## PostgreSQL (Drizzle) — what belongs here
+- `users` — id, email, password_hash
+- `servers` — id, name, owner_id
+- `channels` — id, server_id, name
+- `memberships` — user_id, server_id (join table)
+- `channel_members` — user_id, channel_id (optional, for per-channel access)
+
+Use Drizzle for:
+- All permission/access checks before any message operation
+- Any query that needs relational joins (e.g. "is this user in this server?")
+- All writes that require ACID guarantees
+
+## MongoDB (Mongoose) — what belongs here
+- `messages` — _id, channel_id, user_id, content, created_at
+
+Use Mongoose for:
+- Insert on every send
+- Paginated read by `channelId`
+- Nothing else
+
+## The send-message coordination contract
+Permission check (Postgres) MUST complete before message write (Mongo).
+This happens in the **service layer**, never in a repository.
+
+```typescript
+// CORRECT — service coordinates both DBs
+async sendMessage(dto) {
+  await this.memberPgRepo.assertMembership(dto.userId, dto.channelId); // PG first
+  return this.messageMgoRepo.insert(dto);                               // Mongo after
+}
+
+// WRONG — skipping the PG check
+async sendMessage(dto) {
+  return this.messageMgoRepo.insert(dto); // no permission check = broken architecture
+}
+```
+
+## Do NOT cross the boundary with Mongoose populate
+Mongoose `populate()` is for refs within MongoDB only.
+Never use it to reference a PostgreSQL entity ID as if it were a Mongo document.
+If a message response needs user details, query Postgres separately and map in the service.
+
+```typescript
+// CORRECT
+const messages = await this.messageMgoRepo.findByChannel(channelId, cursor);
+const userIds = messages.map(m => m.userId);
+const users = await this.userPgRepo.findByIds(userIds);
+return messages.map(m => ({ ...m, user: users.find(u => u.id === m.userId) }));
+
+// WRONG
+Message.find().populate('userId') // userId is a PG UUID — this will fail or silently return null
+```
+
+## Mongoose schema for Message — use exactly this, nothing extra
+```typescript
+const MessageSchema = new Schema({
+  channelId: { type: String, required: true, index: true },
+  userId:    { type: String, required: true },
+  content:   { type: String, required: true, maxlength: 2000 },
+  createdAt: { type: Date, default: Date.now },
+});
+```
+
+`index: true` on `channelId` is the only index needed at this scale.
+Do not add compound indexes, TTL, or text search indexes unless explicitly required.
+
+## Pagination — cursor-based on createdAt
+```typescript
+// load 50 messages before a cursor
+const messages = await MessageModel
+  .find({ channelId, createdAt: { $lt: cursor ?? new Date() } })
+  .sort({ createdAt: -1 })
+  .limit(50);
+```
+
+Do not use offset pagination (`skip()`). It degrades on large collections and defeats the point of using Mongo for messages.

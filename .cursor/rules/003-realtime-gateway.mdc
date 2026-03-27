@@ -1,0 +1,77 @@
+---
+description: Socket.IO gateway rules. Apply when creating or editing any gateway, socket handler, or realtime event.
+globs: ["src/realtime/**", "src/**/*.gateway.ts"]
+alwaysApply: false
+---
+
+# Realtime / Socket.IO Rules
+
+## Gateway responsibility — only 3 things
+1. Handle the socket event
+2. Call a service method for any logic
+3. Emit the result to the correct room
+
+The gateway is a thin transport layer. It has no business logic.
+
+## Room naming convention
+```
+channel:{channelId}    ← message broadcast room
+server:{serverId}      ← server-level events (e.g. new channel created)
+```
+
+## Connection lifecycle
+```typescript
+handleConnection(client: Socket) {
+  // Authenticate JWT from handshake.auth.token
+  // Attach userId to client.data.userId
+  // Do NOT join rooms here — wait for explicit join event
+}
+
+handleDisconnect(client: Socket) {
+  // No cleanup needed for rooms — Socket.IO handles it
+}
+```
+
+## Join channel room — explicit event required
+Client must emit `join_channel` with `{ channelId }`.
+Gateway checks membership (via service), then adds to room.
+
+```typescript
+@SubscribeMessage('join_channel')
+async handleJoinChannel(client: Socket, { channelId }: { channelId: string }) {
+  await this.channelService.assertMembership(client.data.userId, channelId);
+  client.join(`channel:${channelId}`);
+}
+```
+
+## Send message event
+```typescript
+@SubscribeMessage('send_message')
+async handleSendMessage(client: Socket, dto: SendMessageDto) {
+  const msg = await this.messageService.sendMessage({
+    ...dto,
+    userId: client.data.userId,   // always from socket auth, never from client payload
+  });
+  this.server.to(`channel:${dto.channelId}`).emit('new_message', msg);
+}
+```
+
+## Security: never trust client-sent userId
+`userId` on every event MUST come from `client.data.userId` (set during JWT auth at connection).
+If the client sends a `userId` field in the payload, ignore it.
+
+## Error handling in gateway
+```typescript
+// Emit error back to the requesting client only, don't crash the server
+try {
+  ...
+} catch (err) {
+  client.emit('error', { message: err.message });
+}
+```
+
+## What does NOT belong in the gateway
+- DB queries (call service instead)
+- Permission logic (call service instead)
+- Any `if` condition about domain rules
+- Message formatting or transformation
