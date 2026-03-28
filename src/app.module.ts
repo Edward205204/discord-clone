@@ -8,10 +8,11 @@ import { AuthenticationGuard } from './shared/common/guards/authentication.guard
 import CustomZodValidationPipe from './shared/common/pipes/z-validation.pipe'
 import { ZodSerializerInterceptor } from 'nestjs-zod'
 import { SecurityModule } from './shared/infrastructure/security/security.module'
+import { UserModule } from './modules/user/user.module';
 
 const SharedModules = [DatabaseModule, SecurityModule]
 @Module({
-  imports: [AuthModule, ...SharedModules],
+  imports: [AuthModule, ...SharedModules, UserModule],
   providers: [
     AccessTokenGuard,
     APIKeyGuard,

@@ -2,8 +2,9 @@ import { Inject, Injectable } from '@nestjs/common'
 import { and, eq, gt } from 'drizzle-orm'
 import { DRIZZLE_DB } from 'src/shared/infrastructure/database/database.constants'
 import type { DrizzleDb } from 'src/shared/infrastructure/database/database.types'
-import { refreshTokens, users, verificationCodes } from './auth.schema'
+import { refreshTokens, verificationCodes } from './auth.schema'
 import { VerificationCodeType } from 'src/shared/constant/verification-type'
+import { users } from '../user/user.schema'
 
 @Injectable()
 export class AuthRepository {
