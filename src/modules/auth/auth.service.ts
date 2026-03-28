@@ -1,21 +1,30 @@
-import {
-  BadRequestException,
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { randomInt } from 'node:crypto'
 import { env } from 'src/shared/infrastructure/config/env.config'
 import { HashingService } from 'src/shared/infrastructure/security/hashing.service'
 import { TokenService } from 'src/shared/infrastructure/security/token.service'
-import { LoginBodyType, LogoutBodyType, RegisterBodyType, SendRegistrationVerificationBodyType } from './auth.model'
+import {
+  LoginBodyType,
+  LogoutBodyType,
+  RefreshTokenBodyType,
+  RegisterBodyType,
+  ResetPasswordBodyType,
+  SendRegistrationVerificationBodyType,
+  SendResetPasswordVerificationBodyType,
+} from './auth.model'
 import { AuthRepository } from './auth.repo'
 import { TransactionService } from 'src/shared/infrastructure/database/transaction.service'
 import { VerificationCode } from 'src/shared/constant/verification-type'
+import {
+  AuthCannotInitializeRefreshTokenException,
+  AuthEmailAlreadyExistsUnprocessableException,
+  AuthEmailAlreadyRegisteredConflictException,
+  AuthEmailNotFoundConflictException,
+  AuthInvalidLoginCredentialsException,
+  AuthInvalidOrExpiredOtpException,
+  AuthInvalidRefreshTokenException,
+  AuthOtpRateLimitedException,
+} from './auth.exceptions'
 
 @Injectable()
 export class AuthService {
@@ -29,18 +38,18 @@ export class AuthService {
   ) {}
 
   async register(body: RegisterBodyType) {
-    const userId = await this.authRepo.getUserIdByEmail(body.email)
+    const userId = await this.authRepo.findUserIdByEmail(body.email)
 
     if (userId) {
-      throw new ConflictException('Email already exists')
+      throw new AuthEmailAlreadyExistsUnprocessableException()
     }
-    const verificationCode = await this.authRepo.getValidVerificationCodeId(
+    const verificationCode = await this.authRepo.findValidVerificationCodeId(
       body.email,
       body.otp,
       VerificationCode.REGISTRATION,
     )
     if (!verificationCode) {
-      throw new BadRequestException('Invalid or expired OTP')
+      throw new AuthInvalidOrExpiredOtpException('otp')
     }
 
     const hashedPassword = await this.hashingService.hash(body.password)
@@ -62,7 +71,7 @@ export class AuthService {
       const refreshTokenPayload = this.tokenService.decodeToken(tokens.refreshToken) as { exp?: number } | null
 
       if (!refreshTokenPayload?.exp) {
-        throw new InternalServerErrorException('Cannot initialize refresh token')
+        throw new AuthCannotInitializeRefreshTokenException()
       }
 
       await this.authRepo.createRefreshToken(
@@ -94,12 +103,12 @@ export class AuthService {
   async login(body: LoginBodyType) {
     const user = await this.authRepo.findUserByEmailWithCredentials(body.email)
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password')
+      throw new AuthInvalidLoginCredentialsException()
     }
 
     const isCorrectPassword = await this.hashingService.compare(body.password, user.password)
     if (!isCorrectPassword) {
-      throw new UnauthorizedException('Invalid email or password')
+      throw new AuthInvalidLoginCredentialsException()
     }
 
     const tokens = await this.tokenService.generateTokens({
@@ -109,7 +118,7 @@ export class AuthService {
 
     const refreshTokenPayload = this.tokenService.decodeToken(tokens.refreshToken) as { exp?: number } | null
     if (!refreshTokenPayload?.exp) {
-      throw new InternalServerErrorException('Cannot initialize refresh token')
+      throw new AuthCannotInitializeRefreshTokenException()
     }
 
     await this.authRepo.createRefreshToken({
@@ -132,27 +141,22 @@ export class AuthService {
   }
 
   async sendRegistrationVerificationCode(body: SendRegistrationVerificationBodyType) {
-    const existingUser = await this.authRepo.getUserIdByEmail(body.email)
+    const existingUser = await this.authRepo.findUserIdByEmail(body.email)
+
     if (existingUser) {
-      throw new ConflictException('Email already registered')
+      throw new AuthEmailAlreadyRegisteredConflictException()
     }
 
-    const lastSend = await this.authRepo.getVerificationLastSentAt(body.email, VerificationCode.REGISTRATION)
+    const lastSend = await this.authRepo.findVerificationLastSentAt(body.email, VerificationCode.REGISTRATION)
     if (lastSend) {
       const elapsedMs = Date.now() - lastSend.updatedAt.getTime()
       if (elapsedMs < env.OTP_BUFFER_MS) {
         const retryAfterSec = Math.max(1, Math.ceil((env.OTP_BUFFER_MS - elapsedMs) / 1000))
-        throw new HttpException(
-          {
-            message: 'Please wait before requesting another verification code',
-            retryAfterSec,
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        )
+        throw new AuthOtpRateLimitedException(retryAfterSec)
       }
     }
 
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0')
+    const code = randomInt(0, 1_000_000).toString().padStart(env.OTP_LENGTH, '0')
     const expiresAt = new Date(Date.now() + env.OTP_TTL_MS)
 
     await this.authRepo.upsertVerificationCode({
@@ -169,8 +173,105 @@ export class AuthService {
     return { message: 'Verification code sent' }
   }
 
+  async sendResetPasswordVerificationCode(body: SendResetPasswordVerificationBodyType) {
+    const user = await this.authRepo.findUserIdByEmail(body.email)
+    if (!user) {
+      throw new AuthEmailNotFoundConflictException()
+    }
+    const lastSend = await this.authRepo.findVerificationLastSentAt(body.email, VerificationCode.RESET_PASSWORD)
+    if (lastSend) {
+      const elapsedMs = Date.now() - lastSend.updatedAt.getTime()
+      if (elapsedMs < env.OTP_BUFFER_MS) {
+        const retryAfterSec = Math.max(1, Math.ceil((env.OTP_BUFFER_MS - elapsedMs) / 1000))
+        throw new AuthOtpRateLimitedException(retryAfterSec)
+      }
+    }
+
+    const code = randomInt(0, 1_000_000).toString().padStart(env.OTP_LENGTH, '0')
+    const expiresAt = new Date(Date.now() + env.OTP_TTL_MS)
+
+    await this.authRepo.upsertVerificationCode({
+      email: body.email,
+      code,
+      expiresAt,
+      type: VerificationCode.RESET_PASSWORD,
+    })
+
+    this.logger.log(
+      `[DEV] Reset password verification code for ${body.email}: ${code} (expires ${expiresAt.toISOString()})`,
+    )
+
+    return { message: 'Verification code sent' }
+  }
+
+  async resetPassword(body: ResetPasswordBodyType) {
+    const verificationCode = await this.authRepo.findValidVerificationCodeId(
+      body.email,
+      body.otp,
+      VerificationCode.RESET_PASSWORD,
+    )
+    if (!verificationCode) {
+      throw new AuthInvalidOrExpiredOtpException('otp')
+    }
+
+    const user = await this.authRepo.findUserByEmailWithCredentials(body.email)
+    if (!user) {
+      throw new AuthInvalidOrExpiredOtpException('email')
+    }
+
+    const hashedPassword = await this.hashingService.hash(body.password)
+
+    await this.txService.run(async (tx) => {
+      await this.authRepo.updatePasswordByUserId(user.id, hashedPassword, tx)
+      await this.authRepo.deleteRefreshTokensByUserId(user.id, tx)
+      await this.authRepo.deleteVerificationCodeById(verificationCode.id, tx)
+    })
+
+    return { message: 'Password has been reset successfully' }
+  }
+
   async logout(body: LogoutBodyType) {
     await this.authRepo.deleteRefreshTokenByRawToken(body.refreshToken)
     return { message: 'Logged out successfully' }
+  }
+
+  async refreshToken(body: RefreshTokenBodyType) {
+    const tokenPayload = await this.tokenService.verifyRefreshToken(body.refreshToken)
+
+    const refreshToken = await this.authRepo.findRefreshTokenByToken(body.refreshToken)
+
+    if (!refreshToken) {
+      throw new AuthInvalidRefreshTokenException('Invalid refresh token')
+    }
+
+    const tokens = await this.tokenService.generateTokens({
+      userId: refreshToken.userId,
+      role: tokenPayload.role,
+    })
+
+    const refreshTokenPayload = this.tokenService.decodeToken(tokens.refreshToken) as { exp?: number } | null
+
+    if (!refreshTokenPayload?.exp) {
+      throw new AuthCannotInitializeRefreshTokenException()
+    }
+
+    const exp = refreshTokenPayload.exp
+
+    await this.txService.run(async (tx) => {
+      await this.authRepo.deleteRefreshTokenByRawToken(body.refreshToken, tx)
+      await this.authRepo.createRefreshToken(
+        {
+          token: tokens.refreshToken,
+          userId: refreshToken.userId,
+          expiresAt: new Date(exp * 1000),
+        },
+        tx,
+      )
+    })
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    }
   }
 }

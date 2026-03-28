@@ -41,6 +41,7 @@ const envSchema = z.object({
 
   OTP_TTL_MS: durationToMs('OTP_TTL_MS'),
   OTP_BUFFER_MS: durationToMs('OTP_BUFFER_MS'),
+  OTP_LENGTH: z.coerce.number(),
 })
 
 export default envSchema

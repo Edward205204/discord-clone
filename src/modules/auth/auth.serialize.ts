@@ -19,3 +19,8 @@ export const AuthResponse = z.object({
 export const MessageResponse = z.object({
   message: z.string('Message is required'),
 })
+
+export const RefreshTokenResponse = z.object({
+  accessToken: z.string('Access token is required'),
+  refreshToken: z.string('Refresh token is required'),
+})

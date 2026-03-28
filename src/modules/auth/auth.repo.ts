@@ -9,7 +9,7 @@ import { VerificationCodeType } from 'src/shared/constant/verification-type'
 export class AuthRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDb) {}
 
-  async getUserIdByEmail(email: string) {
+  async findUserIdByEmail(email: string) {
     const [userId] = await this.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
 
     return userId
@@ -32,7 +32,7 @@ export class AuthRepository {
     return user
   }
 
-  async getVerificationLastSentAt(email: string, type: VerificationCodeType) {
+  async findVerificationLastSentAt(email: string, type: VerificationCodeType) {
     const [row] = await this.db
       .select({ updatedAt: verificationCodes.updatedAt })
       .from(verificationCodes)
@@ -42,7 +42,7 @@ export class AuthRepository {
     return row
   }
 
-  async getValidVerificationCodeId(email: string, otp: string, type: VerificationCodeType) {
+  async findValidVerificationCodeId(email: string, otp: string, type: VerificationCodeType) {
     const [verificationCode] = await this.db
       .select({ id: verificationCodes.id })
       .from(verificationCodes)
@@ -57,6 +57,11 @@ export class AuthRepository {
       .limit(1)
 
     return verificationCode
+  }
+
+  async findRefreshTokenByToken(token: string, db: DrizzleDb = this.db) {
+    const [tokens] = await db.select().from(refreshTokens).where(eq(refreshTokens.token, token)).limit(1)
+    return tokens
   }
 
   async createUser(
@@ -79,6 +84,14 @@ export class AuthRepository {
 
   async deleteRefreshTokenByRawToken(token: string, db: DrizzleDb = this.db) {
     await db.delete(refreshTokens).where(eq(refreshTokens.token, token))
+  }
+
+  async deleteRefreshTokensByUserId(userId: string, db: DrizzleDb = this.db) {
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId))
+  }
+
+  async updatePasswordByUserId(userId: string, hashedPassword: string, db: DrizzleDb = this.db) {
+    await db.update(users).set({ password: hashedPassword, updatedAt: new Date() }).where(eq(users.id, userId))
   }
 
   async deleteVerificationCodeById(verificationCodeId: string, db: DrizzleDb = this.db) {
