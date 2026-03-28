@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common'
-import TokenPayload from 'src/shared/types/token.payload'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { UserRepository } from './user.repo'
 
 @Injectable()
 export class UserService {
   constructor(private readonly userRepo: UserRepository) {}
-  // async getMe(user: TokenPayload) {
-  //   const user = await this.userRepo.findUserById(user.id)
-  // }
+  async getMe(userId: string) {
+    const user = await this.userRepo.findUserById(userId)
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+    return user
+  }
 }

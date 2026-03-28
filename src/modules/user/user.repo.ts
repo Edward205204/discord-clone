@@ -1,16 +1,20 @@
-import { Inject, Injectable } from '@nestjs/common'
-import { DRIZZLE_DB } from 'src/shared/infrastructure/database/database.constants'
-import type { DrizzleDb } from 'src/shared/infrastructure/database/database.types'
+import { TransactionHost } from '@nestjs-cls/transactional'
+import { Injectable } from '@nestjs/common'
+import type { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.types'
 
 import { eq } from 'drizzle-orm'
 import { users } from './user.schema'
 
 @Injectable()
 export class UserRepository {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDb) {}
+  constructor(private readonly txHost: TransactionHost<MyDrizzleAdapter>) {}
 
-  async findUserById(id: string, db: DrizzleDb = this.db) {
-    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1)
+  async findUserById(id: string) {
+    const [user] = await this.txHost.tx
+      .select({ id: users.id, email: users.email, userName: users.userName, avatar: users.avatar, role: users.role })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
     return user
   }
 }

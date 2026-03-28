@@ -9,6 +9,6 @@ export class UserController {
 
   @Get('me')
   getMe(@ActiveUser() user: TokenPayload) {
-    // return this.userService.getMe(user)
+    return this.userService.getMe(user.userId)
   }
 }
