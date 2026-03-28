@@ -3,6 +3,7 @@ import { and, eq, gt } from 'drizzle-orm'
 import { DRIZZLE_DB } from 'src/shared/infrastructure/database/database.constants'
 import type { DrizzleDb } from 'src/shared/infrastructure/database/database.types'
 import { refreshTokens, users, verificationCodes } from './auth.schema'
+import { VerificationCodeType } from 'src/shared/constant/verification-type'
 
 @Injectable()
 export class AuthRepository {
@@ -31,7 +32,17 @@ export class AuthRepository {
     return user
   }
 
-  async getValidRegistrationVerificationCodeId(email: string, otp: string) {
+  async getVerificationLastSentAt(email: string, type: VerificationCodeType) {
+    const [row] = await this.db
+      .select({ updatedAt: verificationCodes.updatedAt })
+      .from(verificationCodes)
+      .where(and(eq(verificationCodes.email, email), eq(verificationCodes.type, type)))
+      .limit(1)
+
+    return row
+  }
+
+  async getValidVerificationCodeId(email: string, otp: string, type: VerificationCodeType) {
     const [verificationCode] = await this.db
       .select({ id: verificationCodes.id })
       .from(verificationCodes)
@@ -39,7 +50,7 @@ export class AuthRepository {
         and(
           eq(verificationCodes.email, email),
           eq(verificationCodes.code, otp),
-          eq(verificationCodes.type, 'registration'),
+          eq(verificationCodes.type, type),
           gt(verificationCodes.expiresAt, new Date()),
         ),
       )
@@ -68,5 +79,27 @@ export class AuthRepository {
 
   async deleteVerificationCodeById(verificationCodeId: string, db: DrizzleDb = this.db) {
     await db.delete(verificationCodes).where(eq(verificationCodes.id, verificationCodeId))
+  }
+
+  async upsertVerificationCode(
+    payload: { email: string; code: string; expiresAt: Date; type: VerificationCodeType },
+    db: DrizzleDb = this.db,
+  ) {
+    await db
+      .insert(verificationCodes)
+      .values({
+        email: payload.email,
+        code: payload.code,
+        type: payload.type,
+        expiresAt: payload.expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: [verificationCodes.email, verificationCodes.type],
+        set: {
+          code: payload.code,
+          expiresAt: payload.expiresAt,
+          updatedAt: new Date(),
+        },
+      })
   }
 }

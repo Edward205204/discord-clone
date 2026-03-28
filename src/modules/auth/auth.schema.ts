@@ -1,15 +1,15 @@
 import { pgTable, varchar, timestamp, text, uniqueIndex, index, uuid } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
-import { Roles } from 'src/shared/constant/system-role'
-const VerificationCodeType = ['registration', 'reset_password', 'verify_email'] as const
+import { ROLE_VALUES } from 'src/shared/constant/system-role'
+import { VERIFICATION_CODE_VALUES } from 'src/shared/constant/verification-type'
 
 export const verificationCodes = pgTable(
   'verification_codes',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: varchar('email', { length: 255 }).notNull(),
-    code: varchar('code', { length: 6 }).notNull(), // Code thường ngắn (6 số)
-    type: text('type', { enum: VerificationCodeType }).notNull(),
+    code: varchar('code', { length: 6 }).notNull(),
+    type: text('type', { enum: VERIFICATION_CODE_VALUES }).notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at')
@@ -51,7 +51,7 @@ export const users = pgTable('users', {
   password: varchar('password', { length: 255 }).notNull(),
   userName: varchar('user_name', { length: 64 }).notNull(),
   avatar: varchar('avatar', { length: 255 }).notNull().default(''),
-  role: text('role', { enum: Roles }).notNull().default('user'),
+  role: text('role', { enum: ROLE_VALUES }).notNull().default('user'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at')
     .notNull()

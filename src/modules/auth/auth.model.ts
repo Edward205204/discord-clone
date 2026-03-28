@@ -33,5 +33,12 @@ export const LoginBody = z.object({
   password: PasswordSchema,
 })
 
+export const SendRegistrationVerificationBody = z
+  .object({
+    email: z.email('Invalid email address'),
+  })
+  .strict()
+
 export type RegisterBodyType = z.infer<typeof RegisterBody>
 export type LoginBodyType = z.infer<typeof LoginBody>
+export type SendRegistrationVerificationBodyType = z.infer<typeof SendRegistrationVerificationBody>
