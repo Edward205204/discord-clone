@@ -1,7 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common'
 import { IsPublic } from 'src/shared/common/decorators/auth.decorator'
 import { AuthService } from './auth.service'
-import { LoginDto, RegisterDto, SendRegistrationVerificationDto } from './auth.dto'
+import { LoginDto, LogoutDto, RegisterDto, SendRegistrationVerificationDto } from './auth.dto'
 import { ZodSerializerDto } from 'nestjs-zod'
 import { AuthResponse, MessageResponse } from './auth.serialize'
 
@@ -28,5 +28,13 @@ export class AuthController {
   @ZodSerializerDto(AuthResponse)
   login(@Body() body: LoginDto) {
     return this.authService.login(body)
+  }
+
+  @IsPublic()
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ZodSerializerDto(MessageResponse)
+  logout(@Body() body: LogoutDto) {
+    return this.authService.logout(body)
   }
 }

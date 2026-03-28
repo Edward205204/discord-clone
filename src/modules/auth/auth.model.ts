@@ -39,6 +39,13 @@ export const SendRegistrationVerificationBody = z
   })
   .strict()
 
+export const LogoutBody = z
+  .object({
+    refreshToken: z.string().min(1, 'Refresh token is required'),
+  })
+  .strict()
+
 export type RegisterBodyType = z.infer<typeof RegisterBody>
 export type LoginBodyType = z.infer<typeof LoginBody>
 export type SendRegistrationVerificationBodyType = z.infer<typeof SendRegistrationVerificationBody>
+export type LogoutBodyType = z.infer<typeof LogoutBody>

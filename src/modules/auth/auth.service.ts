@@ -12,7 +12,7 @@ import { randomInt } from 'node:crypto'
 import { env } from 'src/shared/infrastructure/config/env.config'
 import { HashingService } from 'src/shared/infrastructure/security/hashing.service'
 import { TokenService } from 'src/shared/infrastructure/security/token.service'
-import { LoginBodyType, RegisterBodyType, SendRegistrationVerificationBodyType } from './auth.model'
+import { LoginBodyType, LogoutBodyType, RegisterBodyType, SendRegistrationVerificationBodyType } from './auth.model'
 import { AuthRepository } from './auth.repo'
 import { TransactionService } from 'src/shared/infrastructure/database/transaction.service'
 import { VerificationCode } from 'src/shared/constant/verification-type'
@@ -167,5 +167,10 @@ export class AuthService {
     )
 
     return { message: 'Verification code sent' }
+  }
+
+  async logout(body: LogoutBodyType) {
+    await this.authRepo.deleteRefreshTokenByRawToken(body.refreshToken)
+    return { message: 'Logged out successfully' }
   }
 }

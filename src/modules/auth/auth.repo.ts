@@ -77,6 +77,10 @@ export class AuthRepository {
     await db.insert(refreshTokens).values(payload)
   }
 
+  async deleteRefreshTokenByRawToken(token: string, db: DrizzleDb = this.db) {
+    await db.delete(refreshTokens).where(eq(refreshTokens.token, token))
+  }
+
   async deleteVerificationCodeById(verificationCodeId: string, db: DrizzleDb = this.db) {
     await db.delete(verificationCodes).where(eq(verificationCodes.id, verificationCodeId))
   }
