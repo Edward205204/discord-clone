@@ -1,5 +1,6 @@
 import { pgTable, varchar, timestamp, text, uniqueIndex, index, uuid } from 'drizzle-orm/pg-core'
-
+import { relations } from 'drizzle-orm'
+import { Roles } from 'src/shared/constant/system-role'
 const VerificationCodeType = ['registration', 'reset_password', 'verify_email'] as const
 
 export const verificationCodes = pgTable(
@@ -15,11 +16,9 @@ export const verificationCodes = pgTable(
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
-    userId: uuid('user_id'),
-    // userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
   },
   (table) => [
-    uniqueIndex('email_type_code_idx').on(table.email, table.type, table.code),
+    uniqueIndex('email_type_idx').on(table.email, table.type),
     index('verification_expires_at_idx').on(table.expiresAt),
   ],
 )
@@ -27,11 +26,40 @@ export const verificationCodes = pgTable(
 export const refreshTokens = pgTable(
   'refresh_tokens',
   {
-    token: text('token').primaryKey(),
-    userId: uuid('user_id').notNull(),
-    // .references(() => users.id, { onDelete: 'cascade' }),
+    id: uuid('id').primaryKey().defaultRandom(),
+    token: text('token').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
-  (table) => [index('token_user_id_idx').on(table.userId), index('token_expires_at_idx').on(table.expiresAt)],
+  (table) => [
+    index('refresh_token_user_id_idx').on(table.userId),
+    index('refresh_token_expires_at_idx').on(table.expiresAt),
+  ],
 )
+
+// tạm thời cài đặt user schema ở đây
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password: varchar('password', { length: 255 }).notNull(),
+  userName: varchar('user_name', { length: 64 }).notNull(),
+  avatar: varchar('avatar', { length: 255 }).notNull().default(''),
+  role: text('role', { enum: Roles }).notNull().default('user'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+})
+
+export const usersRelations = relations(users, ({ many }) => ({
+  verificationCodes: many(verificationCodes),
+  refreshTokens: many(refreshTokens),
+}))
