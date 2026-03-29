@@ -1,3 +1,4 @@
+import { Transactional } from '@nestjs-cls/transactional'
 import { Injectable, Logger } from '@nestjs/common'
 import { randomInt } from 'node:crypto'
 import { env } from 'src/shared/infrastructure/config/env.config'
@@ -13,7 +14,6 @@ import {
   SendResetPasswordVerificationBodyType,
 } from './auth.model'
 import { AuthRepository } from './auth.repo'
-import { TransactionService } from 'src/shared/infrastructure/database/transaction.service'
 import { VerificationCode } from 'src/shared/constant/verification-type'
 import {
   AuthCannotInitializeRefreshTokenException,
@@ -34,8 +34,54 @@ export class AuthService {
     private readonly authRepo: AuthRepository,
     private readonly hashingService: HashingService,
     private readonly tokenService: TokenService,
-    private readonly txService: TransactionService,
   ) {}
+
+  @Transactional()
+  async registerTransaction(hashedPassword: string, email: string, userName: string, verificationCodeId: string) {
+    const createdUser = await this.authRepo.createUser({
+      email,
+      userName,
+      password: hashedPassword,
+    })
+
+    const tokens = await this.tokenService.generateTokens({
+      userId: createdUser.id,
+      role: createdUser.role,
+    })
+
+    const refreshTokenPayload = this.tokenService.decodeToken(tokens.refreshToken) as { exp?: number } | null
+
+    if (!refreshTokenPayload?.exp) {
+      throw new AuthCannotInitializeRefreshTokenException()
+    }
+
+    await this.authRepo.createRefreshToken({
+      token: tokens.refreshToken,
+      userId: createdUser.id,
+      expiresAt: new Date(refreshTokenPayload.exp * 1000),
+    })
+
+    await this.authRepo.deleteVerificationCodeById(verificationCodeId)
+
+    return { user: createdUser, tokens }
+  }
+
+  @Transactional()
+  async refreshTokenTransaction(oldRefreshToken: string, newRefreshToken: string, userId: string, expiresAt: Date) {
+    await this.authRepo.deleteRefreshTokenByRawToken(oldRefreshToken)
+    await this.authRepo.createRefreshToken({
+      token: newRefreshToken,
+      userId: userId,
+      expiresAt,
+    })
+  }
+
+  @Transactional()
+  async resetPasswordTransaction(userId: string, hashedPassword: string, verificationCodeId: string) {
+    await this.authRepo.updatePasswordByUserId(userId, hashedPassword)
+    await this.authRepo.deleteRefreshTokensByUserId(userId)
+    await this.authRepo.deleteVerificationCodeById(verificationCodeId)
+  }
 
   async register(body: RegisterBodyType) {
     const userId = await this.authRepo.findUserIdByEmail(body.email)
@@ -53,49 +99,17 @@ export class AuthService {
     }
 
     const hashedPassword = await this.hashingService.hash(body.password)
-    const newUser = await this.txService.run(async (tx) => {
-      const createdUser = await this.authRepo.createUser(
-        {
-          email: body.email,
-          userName: body.userName,
-          password: hashedPassword,
-        },
-        tx,
-      )
 
-      const tokens = await this.tokenService.generateTokens({
-        userId: createdUser.id,
-        role: createdUser.role,
-      })
-
-      const refreshTokenPayload = this.tokenService.decodeToken(tokens.refreshToken) as { exp?: number } | null
-
-      if (!refreshTokenPayload?.exp) {
-        throw new AuthCannotInitializeRefreshTokenException()
-      }
-
-      await this.authRepo.createRefreshToken(
-        {
-          token: tokens.refreshToken,
-          userId: createdUser.id,
-          expiresAt: new Date(refreshTokenPayload.exp * 1000),
-        },
-        tx,
-      )
-
-      await this.authRepo.deleteVerificationCodeById(verificationCode.id, tx)
-
-      return { user: createdUser, tokens }
-    })
+    const data = await this.registerTransaction(hashedPassword, body.email, body.userName, verificationCode.id)
     return {
-      accessToken: newUser.tokens.accessToken,
-      refreshToken: newUser.tokens.refreshToken,
+      accessToken: data.tokens.accessToken,
+      refreshToken: data.tokens.refreshToken,
       user: {
-        id: newUser.user.id,
-        email: newUser.user.email,
-        userName: newUser.user.userName,
-        avatar: newUser.user.avatar,
-        role: newUser.user.role,
+        id: data.user.id,
+        email: data.user.email,
+        userName: data.user.userName,
+        avatar: data.user.avatar,
+        role: data.user.role,
       },
     }
   }
@@ -221,11 +235,7 @@ export class AuthService {
 
     const hashedPassword = await this.hashingService.hash(body.password)
 
-    await this.txService.run(async (tx) => {
-      await this.authRepo.updatePasswordByUserId(user.id, hashedPassword, tx)
-      await this.authRepo.deleteRefreshTokensByUserId(user.id, tx)
-      await this.authRepo.deleteVerificationCodeById(verificationCode.id, tx)
-    })
+    await this.resetPasswordTransaction(user.id, hashedPassword, verificationCode.id)
 
     return { message: 'Password has been reset successfully' }
   }
@@ -257,17 +267,12 @@ export class AuthService {
 
     const exp = refreshTokenPayload.exp
 
-    await this.txService.run(async (tx) => {
-      await this.authRepo.deleteRefreshTokenByRawToken(body.refreshToken, tx)
-      await this.authRepo.createRefreshToken(
-        {
-          token: tokens.refreshToken,
-          userId: refreshToken.userId,
-          expiresAt: new Date(exp * 1000),
-        },
-        tx,
-      )
-    })
+    await this.refreshTokenTransaction(
+      body.refreshToken,
+      tokens.refreshToken,
+      refreshToken.userId,
+      new Date(exp * 1000),
+    )
 
     return {
       accessToken: tokens.accessToken,

@@ -1,23 +1,23 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { TransactionHost } from '@nestjs-cls/transactional'
+import { Injectable } from '@nestjs/common'
 import { and, eq, gt } from 'drizzle-orm'
-import { DRIZZLE_DB } from 'src/shared/infrastructure/database/database.constants'
-import type { DrizzleDb } from 'src/shared/infrastructure/database/database.types'
+import type { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.types'
 import { refreshTokens, verificationCodes } from './auth.schema'
 import { VerificationCodeType } from 'src/shared/constant/verification-type'
 import { users } from '../user/user.schema'
 
 @Injectable()
 export class AuthRepository {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDb) {}
+  constructor(private readonly txHost: TransactionHost<MyDrizzleAdapter>) {}
 
   async findUserIdByEmail(email: string) {
-    const [userId] = await this.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
+    const [userId] = await this.txHost.tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
 
     return userId
   }
 
   async findUserByEmailWithCredentials(email: string) {
-    const [user] = await this.db
+    const [user] = await this.txHost.tx
       .select({
         id: users.id,
         password: users.password,
@@ -34,7 +34,7 @@ export class AuthRepository {
   }
 
   async findVerificationLastSentAt(email: string, type: VerificationCodeType) {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select({ updatedAt: verificationCodes.updatedAt })
       .from(verificationCodes)
       .where(and(eq(verificationCodes.email, email), eq(verificationCodes.type, type)))
@@ -44,7 +44,7 @@ export class AuthRepository {
   }
 
   async findValidVerificationCodeId(email: string, otp: string, type: VerificationCodeType) {
-    const [verificationCode] = await this.db
+    const [verificationCode] = await this.txHost.tx
       .select({ id: verificationCodes.id })
       .from(verificationCodes)
       .where(
@@ -60,16 +60,13 @@ export class AuthRepository {
     return verificationCode
   }
 
-  async findRefreshTokenByToken(token: string, db: DrizzleDb = this.db) {
-    const [tokens] = await db.select().from(refreshTokens).where(eq(refreshTokens.token, token)).limit(1)
+  async findRefreshTokenByToken(token: string) {
+    const [tokens] = await this.txHost.tx.select().from(refreshTokens).where(eq(refreshTokens.token, token)).limit(1)
     return tokens
   }
 
-  async createUser(
-    payload: { email: string; userName: string; password: string; avatar?: string },
-    db: DrizzleDb = this.db,
-  ) {
-    const [createdUser] = await db
+  async createUser(payload: { email: string; userName: string; password: string; avatar?: string }) {
+    const [createdUser] = await this.txHost.tx
       .insert(users)
       .values({
         ...payload,
@@ -79,31 +76,31 @@ export class AuthRepository {
     return createdUser
   }
 
-  async createRefreshToken(payload: { token: string; userId: string; expiresAt: Date }, db: DrizzleDb = this.db) {
-    await db.insert(refreshTokens).values(payload)
+  async createRefreshToken(payload: { token: string; userId: string; expiresAt: Date }) {
+    await this.txHost.tx.insert(refreshTokens).values(payload)
   }
 
-  async deleteRefreshTokenByRawToken(token: string, db: DrizzleDb = this.db) {
-    await db.delete(refreshTokens).where(eq(refreshTokens.token, token))
+  async deleteRefreshTokenByRawToken(token: string) {
+    await this.txHost.tx.delete(refreshTokens).where(eq(refreshTokens.token, token))
   }
 
-  async deleteRefreshTokensByUserId(userId: string, db: DrizzleDb = this.db) {
-    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId))
+  async deleteRefreshTokensByUserId(userId: string) {
+    await this.txHost.tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId))
   }
 
-  async updatePasswordByUserId(userId: string, hashedPassword: string, db: DrizzleDb = this.db) {
-    await db.update(users).set({ password: hashedPassword, updatedAt: new Date() }).where(eq(users.id, userId))
+  async updatePasswordByUserId(userId: string, hashedPassword: string) {
+    await this.txHost.tx
+      .update(users)
+      .set({ password: hashedPassword, updatedAt: new Date() })
+      .where(eq(users.id, userId))
   }
 
-  async deleteVerificationCodeById(verificationCodeId: string, db: DrizzleDb = this.db) {
-    await db.delete(verificationCodes).where(eq(verificationCodes.id, verificationCodeId))
+  async deleteVerificationCodeById(verificationCodeId: string) {
+    await this.txHost.tx.delete(verificationCodes).where(eq(verificationCodes.id, verificationCodeId))
   }
 
-  async upsertVerificationCode(
-    payload: { email: string; code: string; expiresAt: Date; type: VerificationCodeType },
-    db: DrizzleDb = this.db,
-  ) {
-    await db
+  async upsertVerificationCode(payload: { email: string; code: string; expiresAt: Date; type: VerificationCodeType }) {
+    await this.txHost.tx
       .insert(verificationCodes)
       .values({
         email: payload.email,
