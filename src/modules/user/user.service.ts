@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { UserRepository } from './user.repo'
+import { UpdateUserBodyType } from './user.model'
+import { filterDto } from 'src/shared/util/filter-dto'
 
 @Injectable()
 export class UserService {
@@ -9,6 +11,15 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('User not found')
     }
+    return user
+  }
+
+  async updateMe(userId: string, body: UpdateUserBodyType) {
+    const updateDate = filterDto(body)
+    if (!Object.keys(updateDate).length) {
+      throw new BadRequestException('No fields to update')
+    }
+    const user = await this.userRepo.updateUserById(userId, updateDate)
     return user
   }
 }

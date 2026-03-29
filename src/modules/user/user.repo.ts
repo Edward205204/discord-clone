@@ -1,9 +1,9 @@
 import { TransactionHost } from '@nestjs-cls/transactional'
 import { Injectable } from '@nestjs/common'
 import type { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.types'
-
 import { eq } from 'drizzle-orm'
 import { users } from './user.schema'
+import { UpdateUserBodyType } from './user.model'
 
 @Injectable()
 export class UserRepository {
@@ -15,6 +15,15 @@ export class UserRepository {
       .from(users)
       .where(eq(users.id, id))
       .limit(1)
+    return user
+  }
+
+  async updateUserById(id: string, data: Partial<UpdateUserBodyType>) {
+    const [user] = await this.txHost.tx
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning({ id: users.id, email: users.email, userName: users.userName, avatar: users.avatar, role: users.role })
     return user
   }
 }

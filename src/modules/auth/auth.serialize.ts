@@ -1,6 +1,6 @@
 import z from 'zod'
 
-// response cho thông tin cơ bản cho user
+// @shared UserResponse
 export const UserResponse = z.object({
   id: z.string('ID is required'),
   email: z.string('Email is required'),
