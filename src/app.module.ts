@@ -16,12 +16,14 @@ import { ClsPluginTransactional } from '@nestjs-cls/transactional'
 import { ServerModule } from './modules/server/server.module'
 import { HttpExceptionFilter } from './shared/common/filters/http-exc.filter'
 
-const SharedModules = [DatabaseModule, SecurityModule, ServerModule]
+import { ChannelModule } from './modules/channel/channel.module'
+
+const SharedModules = [DatabaseModule, SecurityModule]
+const DomainModules = [UserModule, ChannelModule, AuthModule, ServerModule]
 @Module({
   imports: [
-    AuthModule,
+    ...DomainModules,
     ...SharedModules,
-    UserModule,
     ClsModule.forRoot({
       global: true,
       middleware: {
