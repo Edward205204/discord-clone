@@ -4,34 +4,10 @@ import { and, eq, gt } from 'drizzle-orm'
 import type { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.types'
 import { refreshTokens, verificationCodes } from './auth.schema'
 import { VerificationCodeType } from 'src/shared/constant/verification-type'
-import { users } from '../user/user.schema'
 
 @Injectable()
 export class AuthRepository {
   constructor(private readonly txHost: TransactionHost<MyDrizzleAdapter>) {}
-
-  async findUserIdByEmail(email: string) {
-    const [userId] = await this.txHost.tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
-
-    return userId
-  }
-
-  async findUserByEmailWithCredentials(email: string) {
-    const [user] = await this.txHost.tx
-      .select({
-        id: users.id,
-        password: users.password,
-        email: users.email,
-        userName: users.userName,
-        avatar: users.avatar,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1)
-
-    return user
-  }
 
   async findVerificationLastSentAt(email: string, type: VerificationCodeType) {
     const [row] = await this.txHost.tx
@@ -65,17 +41,6 @@ export class AuthRepository {
     return tokens
   }
 
-  async createUser(payload: { email: string; userName: string; password: string; avatar?: string }) {
-    const [createdUser] = await this.txHost.tx
-      .insert(users)
-      .values({
-        ...payload,
-      })
-      .returning({ id: users.id, role: users.role, avatar: users.avatar, email: users.email, userName: users.userName })
-
-    return createdUser
-  }
-
   async createRefreshToken(payload: { token: string; userId: string; expiresAt: Date }) {
     await this.txHost.tx.insert(refreshTokens).values(payload)
   }
@@ -86,13 +51,6 @@ export class AuthRepository {
 
   async deleteRefreshTokensByUserId(userId: string) {
     await this.txHost.tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId))
-  }
-
-  async updatePasswordByUserId(userId: string, hashedPassword: string) {
-    await this.txHost.tx
-      .update(users)
-      .set({ password: hashedPassword, updatedAt: new Date() })
-      .where(eq(users.id, userId))
   }
 
   async deleteVerificationCodeById(verificationCodeId: string) {

@@ -9,10 +9,23 @@ import {
 import { ServerRepository } from './server.repo'
 import type { CreateInviteBodyType, CreateServerBodyType } from './server.model'
 import { ServerRole } from 'src/shared/constant/server-role'
+import { ChannelService } from '../channel/channel.service'
 
 @Injectable()
 export class ServerService {
-  constructor(private readonly serverRepository: ServerRepository) {}
+  constructor(
+    private readonly serverRepository: ServerRepository,
+    private readonly channelService: ChannelService,
+  ) {}
+
+  // TODO: service thiếu lấy danh sách thành viên trong server(server modules).
+  // TODO: thêm mod cho server(server modules).
+  // TODO: xóa mod cho server(server modules).
+  // TODO: transfer ownership (owner muốn rời server)
+  // TODO: lấy thông tin server (name, owner, member count...)
+  // TODO: update server (đổi tên,...)
+  // TODO: xóa server (chỉ owner)
+  // TODO: ban server khỏi discord
 
   @Transactional()
   async createServer(userId: string, body: CreateServerBodyType) {
@@ -85,7 +98,7 @@ export class ServerService {
   @Transactional()
   async leaveServerTransaction(userId: string, serverId: string) {
     await this.serverRepository.deleteMembershipByUserIdAndServerId(userId, serverId)
-    await this.serverRepository.deleteChannelMembersByUserId(userId)
+    await this.channelService.deleteChannelMembersByUserId(userId)
   }
 
   async leaveServer(userId: string, serverId: string) {

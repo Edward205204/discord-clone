@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common'
 import { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.types'
 import { CreateInviteBodyType, CreateMembership, CreateServerBodyType } from './server.model'
 import { memberships, serverInvites, servers } from './server.schema'
-import { channelMembers } from '../channel/channel.schema'
 import { nanoid } from 'nanoid'
 import { and, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import { users } from '../user/user.schema'
@@ -117,9 +116,5 @@ export class ServerRepository {
     await this.txHost.tx
       .delete(memberships)
       .where(and(eq(memberships.serverId, serverId), eq(memberships.userId, userId)))
-  }
-
-  async deleteChannelMembersByUserId(userId: string) {
-    await this.txHost.tx.delete(channelMembers).where(eq(channelMembers.userId, userId))
   }
 }

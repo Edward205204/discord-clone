@@ -22,4 +22,20 @@ export class UserService {
     const user = await this.userRepo.updateUserById(userId, updateDate)
     return user
   }
+
+  findUserIdByEmail(email: string) {
+    return this.userRepo.findUserIdByEmail(email)
+  }
+
+  findUserByEmailWithCredentials(email: string) {
+    return this.userRepo.findUserByEmailWithCredentials(email)
+  }
+
+  createUser(payload: { email: string; userName: string; password: string; avatar?: string }) {
+    return this.userRepo.createUser(payload)
+  }
+
+  updatePasswordByUserId(userId: string, hashedPassword) {
+    return this.userRepo.updatePasswordByUserId(userId, hashedPassword)
+  }
 }

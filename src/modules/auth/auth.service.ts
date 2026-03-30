@@ -25,6 +25,7 @@ import {
   AuthInvalidRefreshTokenException,
   AuthOtpRateLimitedException,
 } from './auth.exceptions'
+import { UserService } from '../user/user.service'
 
 @Injectable()
 export class AuthService {
@@ -34,11 +35,12 @@ export class AuthService {
     private readonly authRepo: AuthRepository,
     private readonly hashingService: HashingService,
     private readonly tokenService: TokenService,
+    private readonly userService: UserService,
   ) {}
 
   @Transactional()
   async registerTransaction(hashedPassword: string, email: string, userName: string, verificationCodeId: string) {
-    const createdUser = await this.authRepo.createUser({
+    const createdUser = await this.userService.createUser({
       email,
       userName,
       password: hashedPassword,
@@ -78,13 +80,13 @@ export class AuthService {
 
   @Transactional()
   async resetPasswordTransaction(userId: string, hashedPassword: string, verificationCodeId: string) {
-    await this.authRepo.updatePasswordByUserId(userId, hashedPassword)
+    await this.userService.updatePasswordByUserId(userId, hashedPassword)
     await this.authRepo.deleteRefreshTokensByUserId(userId)
     await this.authRepo.deleteVerificationCodeById(verificationCodeId)
   }
 
   async register(body: RegisterBodyType) {
-    const userId = await this.authRepo.findUserIdByEmail(body.email)
+    const userId = await this.userService.findUserIdByEmail(body.email)
 
     if (userId) {
       throw new AuthEmailAlreadyExistsUnprocessableException()
@@ -115,7 +117,7 @@ export class AuthService {
   }
 
   async login(body: LoginBodyType) {
-    const user = await this.authRepo.findUserByEmailWithCredentials(body.email)
+    const user = await this.userService.findUserByEmailWithCredentials(body.email)
     if (!user) {
       throw new AuthInvalidLoginCredentialsException()
     }
@@ -155,7 +157,7 @@ export class AuthService {
   }
 
   async sendRegistrationVerificationCode(body: SendRegistrationVerificationBodyType) {
-    const existingUser = await this.authRepo.findUserIdByEmail(body.email)
+    const existingUser = await this.userService.findUserIdByEmail(body.email)
 
     if (existingUser) {
       throw new AuthEmailAlreadyRegisteredConflictException()
@@ -188,7 +190,7 @@ export class AuthService {
   }
 
   async sendResetPasswordVerificationCode(body: SendResetPasswordVerificationBodyType) {
-    const user = await this.authRepo.findUserIdByEmail(body.email)
+    const user = await this.userService.findUserIdByEmail(body.email)
     if (!user) {
       throw new AuthEmailNotFoundConflictException()
     }
@@ -228,7 +230,7 @@ export class AuthService {
       throw new AuthInvalidOrExpiredOtpException('otp')
     }
 
-    const user = await this.authRepo.findUserByEmailWithCredentials(body.email)
+    const user = await this.userService.findUserByEmailWithCredentials(body.email)
     if (!user) {
       throw new AuthInvalidOrExpiredOtpException('email')
     }
