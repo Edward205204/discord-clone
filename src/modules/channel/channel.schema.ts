@@ -18,7 +18,7 @@ export const channels = pgTable(
     isPrivate: boolean('is_private').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (t) => [index('channels_server_id_idx').on(t.serverId)],
+  (t) => [index('channels_server_id_idx').on(t.serverId), index('channels_id_server_id_idx').on(t.id, t.serverId)],
 )
 
 export const channelsRelations = relations(channels, ({ one, many }) => ({
@@ -43,7 +43,11 @@ export const channelMembers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     addedAt: timestamp('added_at').notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.channelId, t.userId] })],
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.userId] }),
+    index('channel_members_user_id_idx').on(t.userId),
+    index('channel_members_channel_id_idx').on(t.channelId),
+  ],
 )
 
 export const channelMembersRelations = relations(channelMembers, ({ one }) => ({
