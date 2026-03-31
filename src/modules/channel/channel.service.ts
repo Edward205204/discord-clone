@@ -5,6 +5,8 @@ import { ChannelRepository } from './channel.repo'
 export class ChannelService {
   constructor(private readonly channelRepository: ChannelRepository) {}
 
+  // Public API
+
   // 1. Tạo channel, chỉ có owner hoặc mode mới có quyền, tạm mod chưa được thêm, sau này làm kĩ rbac sau.
   // Method này ko public route, chỉ tạo channel cho server, server modules tự check quyền rồi gọi lại method này.
 
@@ -20,8 +22,8 @@ export class ChannelService {
 
   // 8. Update channel (đổi tên, đổi public/private)
 
+  // internal - dùng bởi server service
   deleteChannelMembersByUserId(userId: string) {
-    // method ko có public route, dùng để cho server service gọi khi user rời server.
     return this.channelRepository.deleteChannelMembersByUserId(userId)
   }
 }

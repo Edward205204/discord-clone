@@ -6,6 +6,7 @@ import { filterDto } from 'src/shared/util/filter-dto'
 @Injectable()
 export class UserService {
   constructor(private readonly userRepo: UserRepository) {}
+  // Public API
   async getMe(userId: string) {
     const user = await this.userRepo.findUserById(userId)
     if (!user) {
@@ -23,6 +24,7 @@ export class UserService {
     return user
   }
 
+  // internal - dùng bởi auth service
   findUserIdByEmail(email: string) {
     return this.userRepo.findUserIdByEmail(email)
   }
