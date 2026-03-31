@@ -46,7 +46,7 @@ export const channelMembers = pgTable(
   (t) => [
     primaryKey({ columns: [t.channelId, t.userId] }),
     index('channel_members_user_id_idx').on(t.userId),
-    index('channel_members_channel_id_idx').on(t.channelId),
+    // ko cần index cho channelId vì nó đang là leading của composite key
   ],
 )
 

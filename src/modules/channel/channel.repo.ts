@@ -4,6 +4,7 @@ import { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.ty
 import { channelMembers, channels } from './channel.schema'
 import { and, desc, eq } from 'drizzle-orm'
 import { users } from '../user/user.schema'
+import { memberships } from '../server/server.schema'
 
 @Injectable()
 export class ChannelRepository {
@@ -64,11 +65,12 @@ export class ChannelRepository {
     return privateChannels
   }
 
-  async findChannelsPublicByServerId(serverId: string) {
+  async findChannelsPublicWithMembershipsByServerIdAndUserId(userId: string, serverId: string) {
     const publicChannels = await this.txHost.tx
       .select({ channelId: channels.id, channelName: channels.name, isPrivate: channels.isPrivate })
       .from(channels)
-      .where(and(eq(channels.serverId, serverId), eq(channels.isPrivate, false)))
+      .innerJoin(memberships, eq(memberships.serverId, channels.serverId))
+      .where(and(eq(channels.serverId, serverId), eq(channels.isPrivate, false), eq(memberships.userId, userId)))
       .orderBy(desc(channels.createdAt))
     return publicChannels
   }

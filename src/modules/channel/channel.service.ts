@@ -62,7 +62,10 @@ export class ChannelService {
       serverId,
     )
 
-    const publicChannels = await this.channelRepository.findChannelsPublicByServerId(serverId)
+    const publicChannels = await this.channelRepository.findChannelsPublicWithMembershipsByServerIdAndUserId(
+      userId,
+      serverId,
+    )
 
     const channelList = [...privateChannels, ...publicChannels]
     return channelList
