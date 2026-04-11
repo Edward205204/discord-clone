@@ -143,4 +143,11 @@ export class ServerService {
   getMyServerList(userId: string) {
     return this.serverRepository.findServerSummariesByUserId(userId)
   }
+
+  //  -- orchestrator channel service
+
+  createChannel(serverId: string, name: string, isPrivate: boolean) {
+    // mai làm tiếp
+    return this.channelService.createChannel(serverId, name, isPrivate)
+  }
 }
