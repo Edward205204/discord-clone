@@ -22,6 +22,8 @@ const envSchema = z.object({
   OTP_BUFFER_MS: durationToMs('OTP_BUFFER_MS'),
   OTP_LENGTH: z.coerce.number(),
   DEFAULT_INVITE_EXPIRES_AT: durationToMs('DEFAULT_INVITE_EXPIRES_AT'),
+  BACKEND_BASE_URL: z.string(),
+  FRONTEND_BASE_URL: z.string(),
 })
 
 export default envSchema
