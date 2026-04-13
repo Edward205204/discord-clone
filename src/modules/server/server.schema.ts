@@ -9,7 +9,7 @@ import { channels } from '../channel/channel.schema'
 // ─────────────────────────────────────────────
 export const servers = pgTable('servers', {
   id: uuid('id').primaryKey().defaultRandom(),
-  avatar: varchar('avatar', { length: 255 }).default(''),
+  avatar: varchar('avatar', { length: 255 }),
   name: varchar('name', { length: 100 }).notNull(),
   ownerId: uuid('owner_id')
     .notNull()

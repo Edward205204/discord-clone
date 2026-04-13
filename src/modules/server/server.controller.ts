@@ -83,7 +83,7 @@ export class ServerController {
     return this.serverService.kickMember(user.userId, params.serverId, params.targetUserId)
   }
 
-  @Get('me')
+  @Get('list')
   @ApiBearerAuth('access-token')
   @ZodSerializerDto(GetMyServerListResponse)
   getMyServerList(@ActiveUser() user: TokenPayload) {
