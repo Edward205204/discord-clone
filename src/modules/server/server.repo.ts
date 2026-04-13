@@ -25,6 +25,7 @@ export class ServerRepository {
       .select({
         serverId: memberships.serverId,
         serverName: servers.name,
+        serverAvatar: servers.avatar,
       })
       .from(memberships)
       .where(eq(memberships.userId, userId))
@@ -43,6 +44,7 @@ export class ServerRepository {
       .returning({
         id: servers.id,
         name: servers.name,
+        avatar: servers.avatar,
         ownerId: servers.ownerId,
         createdAt: servers.createdAt,
       })

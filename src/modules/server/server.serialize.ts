@@ -33,5 +33,6 @@ export const GetMyServerListResponse = z.array(
   z.object({
     serverId: z.string('Server ID is required'),
     serverName: z.string('Server name is required'),
+    serverAvatar: z.string('Server avatar is required'),
   }),
 )

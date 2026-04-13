@@ -6,6 +6,7 @@ import { env } from 'src/shared/infrastructure/config/env.config'
 export const CreateServerBody = z
   .object({
     name: z.string().min(3, 'Server name must be at least 3 characters'),
+    avatar: z.string().optional(),
   })
   .strict()
 

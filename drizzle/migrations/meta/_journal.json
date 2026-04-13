@@ -8,6 +8,13 @@
       "when": 1774679174482,
       "tag": "0000_organic_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776086413788,
+      "tag": "0001_narrow_lorna_dane",
+      "breakpoints": true
     }
   ]
 }
