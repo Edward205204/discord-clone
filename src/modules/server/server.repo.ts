@@ -30,7 +30,7 @@ export class ServerRepository {
     return server
   }
 
-  async findMemberInfoByUserIdAndServerId(userId: string, serverId: string) {
+  async findMemberInfoByServerId(serverId: string) {
     const members = await this.txHost.tx
       .select({
         userId: memberships.userId,
@@ -40,7 +40,7 @@ export class ServerRepository {
       })
       .from(memberships)
       .innerJoin(users, eq(memberships.userId, users.id))
-      .where(and(eq(memberships.userId, userId), eq(memberships.serverId, serverId)))
+      .where(eq(memberships.serverId, serverId))
     return members
   }
 

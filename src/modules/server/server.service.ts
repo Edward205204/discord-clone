@@ -209,7 +209,11 @@ export class ServerService {
 
   async listMembers(userId: string, serverId: string) {
     // TODO: service thiếu lấy danh sách thành viên trong server(server modules).
-    const members = await this.serverRepository.findMemberInfoByUserIdAndServerId(userId, serverId)
+    const membership = await this.serverRepository.findMembershipByUserIdAndServerId(userId, serverId)
+    if (!membership) {
+      throw new NotFoundException('You are not a member of this server')
+    }
+    const members = await this.serverRepository.findMemberInfoByServerId(serverId)
     return members
   }
 
