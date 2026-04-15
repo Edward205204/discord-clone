@@ -47,6 +47,12 @@ export const CodeSchema = z
 export const JoinServerParams = CodeSchema
 export const RevokeInviteBody = CodeSchema
 
+export const UpdateServerBody = z.object({
+  name: z.string().min(3, 'Server name must be at least 3 characters').optional(),
+  avatar: z.string().optional(),
+})
+
+export type UpdateServerBodyType = z.infer<typeof UpdateServerBody>
 export type CreateServerBodyType = z.infer<typeof CreateServerBody>
 export type CreateInviteBodyType = z.infer<typeof CreateInviteBody>
 export type CreateInviteParamsType = z.infer<typeof CreateInviteParams>

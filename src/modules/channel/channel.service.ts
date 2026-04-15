@@ -85,7 +85,6 @@ export class ChannelService {
   async updateChannel(channelId: string, serverId: string, payload: { name?: string; isPrivate?: boolean }) {
     // 8. Update channel (đổi tên, đổi public/private)
     //  check quyền ở tầng server
-    //  check channel có thuộc về server ko?
 
     const updatedChannel = await this.channelRepository.updateChannel(channelId, serverId, payload)
     if (!updatedChannel) throw new NotFoundException('Failed to update channel')
