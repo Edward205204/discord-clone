@@ -52,6 +52,44 @@ export const UpdateServerBody = z.object({
   avatar: z.string().optional(),
 })
 
+export const TransferOwnershipBody = z
+  .object({
+    newOwnerId: z.string(),
+  })
+  .strict()
+
+export const TargetUserBody = z
+  .object({
+    targetUserId: z.string(),
+  })
+  .strict()
+
+export const ModeratorParams = ServerIdParam.extend({
+  moderatorId: z.string(),
+}).strict()
+
+export const ChannelParams = ServerIdParam.extend({
+  channelId: z.string(),
+}).strict()
+
+export const ChannelMemberParams = ChannelParams.extend({
+  targetUserId: z.string(),
+}).strict()
+
+export const CreateChannelBody = z
+  .object({
+    name: z.string().min(1, 'Channel name is required'),
+    isPrivate: z.boolean(),
+  })
+  .strict()
+
+export const UpdateChannelBody = z
+  .object({
+    name: z.string().min(1, 'Channel name is required'),
+    isPrivate: z.boolean(),
+  })
+  .strict()
+
 export type UpdateServerBodyType = z.infer<typeof UpdateServerBody>
 export type CreateServerBodyType = z.infer<typeof CreateServerBody>
 export type CreateInviteBodyType = z.infer<typeof CreateInviteBody>
