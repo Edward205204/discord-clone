@@ -73,7 +73,7 @@ export const serverInvites = pgTable(
     isRevoked: boolean('is_revoked').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (t) => [index('server_invites_server_id_idx').on(t.serverId)],
+  (t) => [index('server_invites_server_id_created_at_idx').on(t.serverId, t.createdAt)],
 )
 
 export const serverInvitesRelations = relations(serverInvites, ({ one }) => ({
