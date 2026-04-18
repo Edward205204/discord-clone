@@ -36,6 +36,13 @@
       "when": 1776518064102,
       "tag": "0004_ordinary_wild_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776525805429,
+      "tag": "0005_charming_meteorite",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "channels_one_default_per_server_idx" ON "channels" USING btree ("server_id") WHERE "channels"."is_default" = true;

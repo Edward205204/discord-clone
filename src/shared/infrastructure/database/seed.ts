@@ -75,6 +75,7 @@ const seedChannels = [
     serverId: 'a1d9f1e0-2e25-4f5a-bbc1-7d7f8b5c91a0',
     name: 'general',
     isPrivate: false,
+    isDefault: true,
   },
   {
     id: '35556986-a039-4376-ac6d-95f65fcd6652',
@@ -87,6 +88,7 @@ const seedChannels = [
     serverId: 'bb8c3a2b-f8f6-4f98-8da1-e2ef95a6fbc1',
     name: 'general',
     isPrivate: false,
+    isDefault: true,
   },
   {
     id: '95f37db0-9f89-454a-b57e-5dd90c86f33e',
@@ -99,6 +101,7 @@ const seedChannels = [
     serverId: 'f24f8044-5ea6-4c2a-bf18-e0b34d5ab4e1',
     name: 'general',
     isPrivate: false,
+    isDefault: true,
   },
   {
     id: 'da572b8b-e2c0-4ef3-b1db-30044e33ecf8',
@@ -111,6 +114,7 @@ const seedChannels = [
     serverId: '76c58a9e-68ff-4319-b7ea-4d42596f64b8',
     name: 'general',
     isPrivate: false,
+    isDefault: true,
   },
   {
     id: 'b3ff79c7-a17d-4674-b510-ca9d3f4a5719',

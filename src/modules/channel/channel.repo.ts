@@ -2,7 +2,7 @@ import { TransactionHost } from '@nestjs-cls/transactional'
 import { Injectable } from '@nestjs/common'
 import { MyDrizzleAdapter } from 'src/shared/infrastructure/database/database.types'
 import { channelMembers, channels } from './channel.schema'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, or, sql } from 'drizzle-orm'
 import { users } from '../user/user.schema'
 import { memberships } from '../server/server.schema'
 
@@ -73,6 +73,29 @@ export class ChannelRepository {
       .where(and(eq(channels.serverId, serverId), eq(channels.isPrivate, false), eq(memberships.userId, userId)))
       .orderBy(desc(channels.createdAt))
     return publicChannels
+  }
+
+  async findVisibleChannelsOrdered(userId: string, serverId: string) {
+    return this.txHost.tx
+      .select({
+        channelId: channels.id,
+        channelName: channels.name,
+        isPrivate: channels.isPrivate,
+        isDefault: channels.isDefault,
+        createdAt: channels.createdAt,
+      })
+      .from(channels)
+      .innerJoin(memberships, and(eq(memberships.serverId, channels.serverId), eq(memberships.userId, userId)))
+      .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
+      .where(and(eq(channels.serverId, serverId), or(eq(channels.isPrivate, false), eq(channelMembers.userId, userId))))
+      .orderBy(
+        sql`CASE
+              WHEN ${channels.isDefault} = true THEN 0
+              WHEN ${channels.isPrivate} = true THEN 1
+              ELSE 2
+            END`,
+        desc(channels.createdAt),
+      )
   }
 
   async findMembershipsInChannelWithUserByChannelId(channelId: string) {

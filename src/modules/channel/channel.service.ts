@@ -57,18 +57,7 @@ export class ChannelService {
   async getChannelListForUser(userId: string, serverId: string) {
     // 6. lấy danh sách channel phù hợp dựa vào userId
     //  public route riêng
-    const privateChannels = await this.channelRepository.findChannelMembershipsWithChannelByUserIdAndServerId(
-      userId,
-      serverId,
-    )
-
-    const publicChannels = await this.channelRepository.findChannelsPublicWithMembershipsByServerIdAndUserId(
-      userId,
-      serverId,
-    )
-
-    const channelList = [...privateChannels, ...publicChannels]
-    return channelList
+    return this.channelRepository.findVisibleChannelsOrdered(userId, serverId)
   }
 
   async getMembersOfPrivateChannel(userId, channelId: string, serverId: string) {

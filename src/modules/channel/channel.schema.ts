@@ -1,7 +1,8 @@
 import { pgTable, uuid, varchar, boolean, timestamp, primaryKey, index } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { users } from '../user/user.schema'
 import { servers } from '../server/server.schema'
+import { uniqueIndex } from 'drizzle-orm/pg-core'
 
 // ─────────────────────────────────────────────
 // channels
@@ -19,7 +20,12 @@ export const channels = pgTable(
     isPrivate: boolean('is_private').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (t) => [index('channels_server_is_private_created_at_idx').on(t.serverId, t.isPrivate, t.createdAt)],
+  (t) => [
+    index('channels_server_is_private_created_at_idx').on(t.serverId, t.isPrivate, t.createdAt),
+    uniqueIndex('channels_one_default_per_server_idx')
+      .on(t.serverId)
+      .where(sql`${t.isDefault} = true`),
+  ],
 )
 
 export const channelsRelations = relations(channels, ({ one, many }) => ({
