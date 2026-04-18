@@ -15,6 +15,7 @@ export const channels = pgTable(
       .notNull()
       .references(() => servers.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
+    isDefault: boolean('is_default').notNull().default(false),
     isPrivate: boolean('is_private').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },

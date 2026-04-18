@@ -162,8 +162,15 @@ export class ServerService {
   @Transactional()
   async createServer(userId: string, body: CreateServerBodyType) {
     const server = await this.serverRepository.createServer(userId, body)
+    const DEFAULT_CHANNEL_IS_DEFAULT = true
+    const DEFAULT_CHANNEL_IS_PRIVATE = false
 
-    const channel = await this.channelService.createChannel(server.id, DEFAULT_CHANNEL_NAME, false)
+    const channel = await this.channelService.createChannel(
+      server.id,
+      DEFAULT_CHANNEL_NAME,
+      DEFAULT_CHANNEL_IS_PRIVATE,
+      DEFAULT_CHANNEL_IS_DEFAULT,
+    )
     if (!channel) throw new BadRequestException('Failed to create default channel')
 
     await this.serverRepository.createMembership({

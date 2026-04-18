@@ -16,9 +16,9 @@ export class ChannelService {
     return this.channelRepository.deleteChannelMembersByUserId(userId)
   }
 
-  createChannel(serverId: string, name: string, isPrivate: boolean) {
+  createChannel(serverId: string, name: string, isPrivate: boolean, isDefault?: boolean) {
     // 1. Tạo channel, chỉ có owner hoặc mode mới có quyền, tạm mod chưa được thêm, sau này làm kĩ rbac sau.
-    return this.channelRepository.createChannel(serverId, name, isPrivate)
+    return this.channelRepository.createChannel(serverId, name, isPrivate, isDefault)
   }
 
   async deleteChannel(channelId: string, serverId: string) {

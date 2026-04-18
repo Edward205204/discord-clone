@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid'
 import { and, count, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm'
 import { users } from '../user/user.schema'
 import { ServerRoleType } from 'src/shared/constant/server-role'
+import { channels } from '../channel/channel.schema'
 
 @Injectable()
 export class ServerRepository {
@@ -59,10 +60,15 @@ export class ServerRepository {
         serverId: memberships.serverId,
         serverName: servers.name,
         serverAvatar: servers.avatar,
+        defaultChannel: {
+          channelId: channels.id,
+          channelName: channels.name,
+        },
       })
       .from(memberships)
       .where(eq(memberships.userId, userId))
       .innerJoin(servers, eq(memberships.serverId, servers.id))
+      .leftJoin(channels, and(eq(servers.id, channels.serverId), eq(channels.isDefault, true)))
 
     return myServers
   }

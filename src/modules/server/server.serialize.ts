@@ -34,6 +34,12 @@ export const GetMyServerListResponse = z.array(
     serverId: z.string('Server ID is required'),
     serverName: z.string('Server name is required'),
     serverAvatar: z.string('Server avatar is required').nullable(),
+    defaultChannel: z
+      .object({
+        channelId: z.string('Channel ID is required'),
+        channelName: z.string('Channel name is required'),
+      })
+      .nullable(),
   }),
 )
 

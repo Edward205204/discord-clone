@@ -14,8 +14,8 @@ export class ChannelRepository {
     await this.txHost.tx.delete(channelMembers).where(eq(channelMembers.userId, userId))
   }
 
-  async createChannel(serverId: string, name: string, isPrivate: boolean) {
-    const [channel] = await this.txHost.tx.insert(channels).values({ serverId, name, isPrivate }).returning()
+  async createChannel(serverId: string, name: string, isPrivate: boolean, isDefault: boolean = false) {
+    const [channel] = await this.txHost.tx.insert(channels).values({ serverId, name, isPrivate, isDefault }).returning()
 
     return channel
   }
